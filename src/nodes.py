@@ -15,9 +15,6 @@ Key concepts:
   • Tool nodes: tools are separate graph nodes, not manual loops.
     LangGraph controls the model ⇄ tools cycle natively.
   • Parallel dispatch via Send()
-  • HITL via conversation persistence — if an agent needs info
-    (e.g. additional context), it simply asks. The answer arrives on the
-    next turn with full conversation history.
   • Response synthesis for multi-agent queries
 """
 
@@ -41,10 +38,6 @@ from src.tools import (
     get_tax_info,
     get_market_data,
 )
-"""REMOVE THESE LINES IF YOU WANT TO ENABLE THE OTHER AGENTS
-#    get_portfolio,
-#    set_planning_goals,
-#)"""#REMOVE THESE LINES IF YOU WANT TO ENABLE THE OTHER AGENTS"
 
 logger = get_logger("nodes")
 
@@ -60,7 +53,7 @@ Final answers should be concise, clear, and should always include a disclaimer t
 If the customer asks for specific financial advice, politely decline and suggest they consult a licensed financial advisor.
 
 TOOLS:
-  get_finance_answers   – semantic search over our finance knowledge base
+  get_finance_answers   – semantic search over our finance knowledge base (PDFs, articles, and other resources embedded into our Vector DB) to provide accurate and relevant information.
 
 DOCUMENTS:
 {fin_vector_db}
@@ -87,6 +80,7 @@ GUIDELINES:
   be honest and say we don't currently have what they're looking for.
   Do NOT present irrelevant stock market information as if it matches the request.
 - Keep responses concise and helpful.
+- Final answers should always include a disclaimer that the information provided is for educational purposes only and should not be considered financial advice.
 """
 
 TAX_PROMPT = """\
@@ -105,6 +99,7 @@ GUIDELINES:
   be honest and say we don't currently have what they're looking for.
   Do NOT present irrelevant tax information as if it matches the request.
 - Keep responses concise and helpful.
+- Final answers should always include a disclaimer that the information provided is for educational purposes only and should not be considered financial advice.
 """
 
 # ── Tool bindings ────────────────────────────────────────────
@@ -119,18 +114,6 @@ tax_llm       = llm.bind_tools(tax_tools)
 market_analysis_tools = [get_market_data]
 market_tools_by_name = {t.name: t for t in market_analysis_tools}
 market_llm = llm.bind_tools(market_analysis_tools)
-
-""" #-REMOVE THESE LINES IF YOU WANT TO ENABLE THE OTHER AGENTS
-#portfolio_tools = [get_portfolio]
-#portfolio_tools_by_name = {t.name: t for t in portfolio_tools}
-#portfolio_llm   = llm.bind_tools(portfolio_tools)
-
-#planning_tools = [set_planning_goals, get_portfolio]
-#planning_tools_by_name = {t.name: t for t in planning_tools}
-#planning_llm   = llm.bind_tools(planning_tools)
-
-
-"""
 
 
 # ═══════════════════════════════════════════════════════════
@@ -283,113 +266,6 @@ pb.add_conditional_edges("model", should_continue)
 pb.add_edge("tools", "model")
 market_subgraph = pb.compile()
 
-"""REMOVE THESE LINES IF YOU WANT TO ENABLE THE OTHER AGENTS
-
-# ── Portfolio subgraph ─────────────────────────────────────────
-
-def portfolio_model(state: AgentState) -> dict:
-    #"Call the Portfolio Database. If it asks for info without calling tools,
-    # use interrupt() to pause the graph and collect user input."
-    response = portfolio_llm.invoke(state["messages"])
-    logger.info("[portfolio:model] tool_calls=%s", bool(response.tool_calls))
-
-    # If no tool calls and no tools have been called yet,
-    # the agent is asking for missing info — interrupt for HITL
-    if not response.tool_calls:
-        any_tools_called = any(isinstance(m, ToolMessage) for m in state["messages"])
-        if not any_tools_called:
-            logger.info("[portfolio:model] HITL: interrupting to collect user info")
-            user_reply = interrupt(response.content)
-            logger.info("[portfolio:model] HITL: user replied %r", user_reply)
-            return {"messages": [response, HumanMessage(content=str(user_reply))]}
-
-    return {"messages": [response]}
-
-
-def portfolio_tools(state: AgentState) -> dict:
-    #"Execute tool calls from the portfolio agent."
-    last = state["messages"][-1]
-    results = []
-    for tc in last.tool_calls:
-        name, args = tc["name"], tc["args"]
-        logger.info("[portfolio:tools] %s(%s)", name, args)
-        out = portfolio_tools_by_name[name].invoke(args) if name in portfolio_tools_by_name else f"Unknown tool: {name}"
-        results.append(ToolMessage(content=str(out), tool_call_id=tc["id"]))
-    return {"messages": results}
-
-
-def portfolio_should_continue(state: AgentState) -> str:
-    "Route after portfolio model node. If the last message is a
-    HumanMessage (user answered via HITL interrupt), loop back to model."
-    last = state["messages"][-1]
-    if isinstance(last, HumanMessage):
-        return "model"
-    if hasattr(last, "tool_calls") and last.tool_calls:
-        return "tools"
-    return END
-
-
-sb = StateGraph(AgentState)
-sb.add_node("model", portfolio_model)
-sb.add_node("tools", portfolio_tools)
-sb.add_edge(START, "model")
-sb.add_conditional_edges("model", portfolio_should_continue)
-sb.add_edge("tools", "model")
-portfolio_subgraph = sb.compile()
-
-# ── Planning subgraph ─────────────────────────────────────────
-
-def planning_model(state: AgentState) -> dict:
-    "Call the planning LLM. If it asks for info without calling tools,
-    use interrupt() to pause the graph and collect user input."
-    response = planning_llm.invoke(state["messages"])
-    logger.info("[planning:model] tool_calls=%s", bool(response.tool_calls))
-
-    # If no tool calls and no tools have been called yet,
-    # the agent is asking for missing info — interrupt for HITL
-    if not response.tool_calls:
-        any_tools_called = any(isinstance(m, ToolMessage) for m in state["messages"])
-        if not any_tools_called:
-            logger.info("[planning:model] HITL: interrupting to collect user info")
-            user_reply = interrupt(response.content)
-            logger.info("[planning:model] HITL: user replied %r", user_reply)
-            return {"messages": [response, HumanMessage(content=str(user_reply))]}
-
-    return {"messages": [response]}
-
-
-def planning_tools(state: AgentState) -> dict:
-    "Execute tool calls from the planning LLM."
-    last = state["messages"][-1]
-    results = []
-    for tc in last.tool_calls:
-        name, args = tc["name"], tc["args"]
-        logger.info("[planning:tools] %s(%s)", name, args)
-        out = planning_tools_by_name[name].invoke(args) if name in planning_tools_by_name else f"Unknown tool: {name}"
-        results.append(ToolMessage(content=str(out), tool_call_id=tc["id"]))
-    return {"messages": results}
-
-
-def planning_should_continue(state: AgentState) -> str:
-    "Route after planning model node. If the last message is a
-    HumanMessage (user answered via HITL interrupt), loop back to model."
-    last = state["messages"][-1]
-    if isinstance(last, HumanMessage):
-        return "model"
-    if hasattr(last, "tool_calls") and last.tool_calls:
-        return "tools"
-    return END
-
-
-sb = StateGraph(AgentState)
-sb.add_node("model", planning_model)
-sb.add_node("tools", planning_tools)
-sb.add_edge(START, "model")
-sb.add_conditional_edges("model", planning_should_continue)
-sb.add_edge("tools", "model")
-planning_subgraph = sb.compile()
-
-"""#REMOVE THESE LINES IF YOU WANT TO ENABLE THE OTHER AGENTS
 
 
 # ── Conversation context helper ──────────────────────────────
@@ -412,7 +288,6 @@ def build_context(messages: list[AnyMessage]) -> str:
 # ═══════════════════════════════════════════════════════════
 #  NODE 1 — Orchestrator
 # ═══════════════════════════════════════════════════════════
-#def orchestrator_node(state: FinAsstState) -> Command[Literal["finance_agent", "portfolio_agent", "market_agent", "planning_agent", "tax_agent", "synthesizer"]]:
 
 def orchestrator_node(state: FinAsstState) -> Command[Literal["finance_agent", "tax_agent", "market_agent", "synthesizer"]]:
     """Classify the user query and dispatch to the right agent(s)."""
@@ -427,20 +302,16 @@ def orchestrator_node(state: FinAsstState) -> Command[Literal["finance_agent", "
         f'QUERY: "{user_query}"\n\n'
         'AGENTS:\n'
         '  finance_agent   – financial analysis, investment advice, portfolio management\n'
-        #'  portfolio_agent – portfolio optimization, rebalancing, performance tracking\n'
         '  market_data_agent – market research, stock ticker data\n'
-        #'  planning_agent  – strategic planning, goal setting, financial projections\n'
         '  tax_agent       – tax questions, compliance, planning and optimization strategies\n'
         '  synthesizer     – combines insights from multiple agents\n\n'
         'RULES:\n'
         '1. Greetings, chitchat, general questions (hi, hello, thanks, how are you)\n'
         '   → finance_agent only\n'
         '2. Financial-only queries  → finance_agent only\n'
-        #'3. Portfolio-related queries → portfolio_agent only\n'
-        '4. Market data requests → market_agent only\n'
-        #'5. Strategic planning questions → planning_agent only\n'
-        '6. Tax-related queries → tax_agent only\n'
-        '7. Mixed queries         → ALL agents, requires_synthesis = true\n'
+        '3. Market data requests → market_agent only\n'
+        '4. Tax-related queries → tax_agent only\n'
+        '5. Mixed queries         → ALL agents, requires_synthesis = true\n'
         '\nIMPORTANT: Only route to a specific agent when the query clearly involves their domain. When in doubt, use the synthesizer.\n'
     )
 
@@ -560,70 +431,10 @@ def market_agent(state: WorkerInput) -> Command[Literal["synthesizer"]]:
         update={"agent_results": [{"source": "market_data", "response": answer}]},
         goto="synthesizer",
     )
-"""REMOVE THESE LINES IF YOU WANT TO ENABLE THE OTHER AGENTS
+
 
 # ═══════════════════════════════════════════════════════════
-#  NODE 5 — Portfolio Agent
-# ═══════════════════════════════════════════════════════════
-
-def portfolio_agent(state: WorkerInput) -> Command[Literal["synthesizer"]]:
-    # Run the portfolio management agent via its model ⇄ tools subgraph.
-    # HITL is handled through conversation persistence: if the agent
-    # needs info (e.g. order ID), it responds with a question. The
-    # user's answer arrives on the next turn via the message history.
-    
-    user_query = state.get("user_query", "")
-    task_desc  = state.get("task_description", user_query)
-    logger.info("Portfolio Agent  task=%r", task_desc)
-    context = build_context(state.get("messages", []))
-
-    result = portfolio_subgraph.invoke({"messages": [
-        SystemMessage(content=PORTFOLIO_PROMPT),
-        HumanMessage(content=f"{context}Task: {task_desc}\nCustomer query: {user_query}"),
-    ]})
-
-    answer = result["messages"][-1].content
-
-    return Command(
-        update={"agent_results": [{"source": "portfolio", "response": answer}]},
-        goto="synthesizer",
-    )
-
-# ═══════════════════════════════════════════════════════════
-#  NODE 6 — Planning Agent
-# ═══════════════════════════════════════════════════════════
-
-def planning_agent(state: WorkerInput) -> Command[Literal["synthesizer"]]:
-    "Run the planning agent via its model ⇄ tools subgraph.
-    HITL is handled through conversation persistence: if the agent
-    needs info (e.g. order ID), it responds with a question. The
-    user's answer arrives on the next turn via the message history.
-    "
-    user_query = state.get("user_query", "")
-    task_desc  = state.get("task_description", user_query)
-    logger.info("Planning Agent  task=%r", task_desc)
-    #st.text("Planning Agent  task=%r" % task_desc)
-
-    context = build_context(state.get("messages", []))
-
-    result = planning_subgraph.invoke({"messages": [
-        SystemMessage(content=PORTFOLIO_PROMPT),
-        HumanMessage(content=f"{context}Task: {task_desc}\nCustomer query: {user_query}"),
-    ]})
-
-    answer = result["messages"][-1].content
-
-    return Command(
-        update={"agent_results": [{"source": "planning", "response": answer}]},
-        goto="synthesizer",
-    )
-
-
-
-    """#REMOVE THESE LINES IF YOU WANT TO ENABLE THE OTHER AGENTS
-
-# ═══════════════════════════════════════════════════════════
-#  NODE 7 — Synthesizer
+#  NODE 5 — Synthesizer
 # ═══════════════════════════════════════════════════════════
 
 def synthesizer_node(state: FinAsstState) -> dict:
