@@ -20,13 +20,14 @@ import time
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
 
 from langchain_core.tools import tool
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+
+
 import streamlit as st
-from src.config import get_logger, llm
-from src.config import query_vector_db
+from src.config import get_logger, llm, fin_vector_db
+
 
 logger = get_logger("tools")
 
@@ -46,7 +47,7 @@ def get_finance_answers(query: str) -> str:
     logger.info("get_finance_answers  query=%r", query)
 
     try:
-        docs = query_vector_db(query, k=3)
+        docs = fin_vector_db(query, k=3)
         if not docs:
             return "No finance information found matching your query."
         results = "Found the following finance information:\n\n"

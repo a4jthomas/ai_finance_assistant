@@ -1,5 +1,7 @@
 import streamlit as st 
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
 # Import our modules from the src folder
 from src.tools import fetch_stock_data, process_data, create_candlestick_chart, create_daily_returns_histogram, create_high_low_chart, create_moving_average_chart, create_volume_vs_close_scatter

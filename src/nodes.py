@@ -24,7 +24,6 @@ Key concepts:
 from __future__ import annotations
 
 import operator
-import matplotlib.pyplot as plt
 import streamlit as st
 import yfinance as yf
 
@@ -35,8 +34,7 @@ from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemM
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send, interrupt
 
-from src.config import get_logger, llm
-from src.config import query_vector_db
+from src.config import get_logger, llm, fin_vector_db
 from src.state import FinAsstState, ClassificationResult, WorkerInput
 from src.tools import (
     get_finance_answers,
@@ -65,7 +63,7 @@ TOOLS:
   get_finance_answers   – semantic search over our finance knowledge base
 
 DOCUMENTS:
-{query_vector_db}
+{fin_vector_db}
 
 GUIDELINES:
 -- Be empathetic and professional.

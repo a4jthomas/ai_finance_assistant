@@ -34,14 +34,14 @@ Finnie splits the work across **5 cooperating nodes** inside a LangGraph `StateG
 
 | Capability                  | How It Works                                                                                                                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Parallel agent dispatch** | The orchestrator uses LangGraph's `Send()` to fan out to multiple agents simultaneously.                                                                                                        |
+| **Parallel agent dispatch** | The orchestrator uses LangGraph's `Send()` to fan out to multiple agents simultaneously.                                                                                                                            |
 | **RAG product search**      | Financial questions and answers are embedded into a vector store; the finance agent performs similarity search to find relevant items.  Tax questions are handled by a traditional LLM query with state management. |
-| **Market data**             | Real time market insights are pulled via another tool's API call (Yahoo real time data via yFinance).                                                                                                             |
-| **Web interface**           | An interactive user experience with tools for Portfolio analysis, Planning and Stock ticker evaluation is delivered via widget tools implemented in Streamlit app pages.
-| **Conversation memory**     | A `MemorySaver` checkpointer persists state across turns, so multi-turn conversations "just work".                                                                                                          |
-| **Voice I/O**               | Microphone input + OpenAI TTS output for a fully spoken conversational experience.                                                                                                            |
-| **Response synthesis**      | When multiple agents contribute, an LLM merges the results into a single, natural reply.                                                                                                                          
-|
+| **Market data**             | Real time market insights are pulled via another tool's API call (Yahoo real time data via yFinance).                                                                                                               |
+| **Web interface**           | An interactive user experience with tools for Portfolio analysis, Planning and Stock ticker evaluation is delivered via widget tools implemented in Streamlit app pages.                                            |
+| **Conversation memory**     | A `MemorySaver` checkpointer persists state across turns, so multi-turn conversations "just work".                                                                                                                  |
+| **Voice I/O**               | Microphone input + OpenAI TTS output for a fully spoken conversational experience.                                                                                                                                  |
+| **Response synthesis**      | When multiple agents contribute, an LLM merges the results into a single, natural reply.                                                                                                                            |
+|                             |                                                                                                                                                                                                                     |
 
 ## Project Structure
 
@@ -64,7 +64,6 @@ src/
 ├── rag.py            # Vector store setup for financial documentation
 └── voice.py          # VoiceRecorder & VoiceSpeaker wrappers
 ```
-
 
 ## Prerequisites
 
@@ -99,32 +98,40 @@ pip install -r requirements.txt
 ```
 
  **Note for pip users:** Since you're not using `uv`, replace `uv run python` with just `python` in all the usage commands below. For example:
- ```bash
- # Text mode
- python -m src.main
- 
- # Voice mode
- python -m src.main --voice
- ```
- 
- It's also recommended to use a virtual environment:
- 
- ```bash
- python -m venv .venv
 
- ``` 
+```bash
+# Text mode
+python -m main
+
+# Voice mode
+python -m main --voice
+```
+
+ It's also recommended to use a virtual environment:
+
+```bash
+python -m venv .venv
+
+```
+
  **Windows (PowerShell):**
-  ```bash
-  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\.venv\Scripts\Activate.ps1
- ``` 
+
+```bash
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\.venv\Scripts\Activate.ps1
+```
+
 **Windows (CMD):**
- ```bash
- .venv\Scripts\activate.bat
- ``` 
+
+```bash
+.venv\Scripts\activate.bat
+```
+
 **macOS/Linux:** 
- ```bash
+
+```bash
 source .venv/bin/activate
- ``` 
+```
+
  **Tip**: Your prompt will change to show `(.venv)` when the environment is active.To deactivate at any time, run `deactivate`. 
 
 **Core dependencies:**
@@ -162,7 +169,21 @@ The system supports two modes of interaction, all launched from `main`.
 ### Text Mode (default) — Interactive REPL
 
 ```bash
-run python -m streamlit run main.py
+#install additional dependencies that are required for web app and voice enabled features
+python -m pip install streamlit
+python -m pip install langgraph
+python -m pip install langchain-community
+python -m pip install langchain-openai
+python -m pip install pypdf
+python -m pip install chromadb
+python -m pip install yfinance
+python -m pip install plotly
+python -m pip install sounddevice
+python -m pip install soundfile
+python -c "import pandas"
+
+#Run the web application by including streamlit parameters
+python -m streamlit run main.py
 ```
 
 ```
@@ -186,7 +207,6 @@ LangSmith tracing enabled: True
 🛒  Financial Assistant  (type 'quit' to exit)
 ```
 
-
 ### Voice Mode
 
 ```bash
@@ -205,8 +225,8 @@ Requires a working microphone. The assistant speaks a welcome greeting, listens 
 You: What's the difference between a stock and a bond?
  Agent says: Hello! I'm your Financial Assistant. Here's a concise overview of the differences between stocks and bonds:
 ```
-Note*:  That the financial agent will answer this question via a vector database similarity search of pre encoded documents
 
+Note*:  That the financial agent will answer this question via a vector database similarity search of pre encoded documents
 
 ### General Stock Question Discovery
 
@@ -223,7 +243,6 @@ Note*:  That the market agent will be responsible for answering this question vi
 You: What is a capital gains tax?
 Assistant: A capital gains tax is a tax on the profit realized from the sale of a non-inventory asset that was greater in value than.....
 ```
-
 
 ## Architecture Deep Dive
 
@@ -291,11 +310,4 @@ The graph is compiled with `MemorySaver`, and every invocation uses a consistent
 | Stale agent results across turns | The `agent_results_reducer` resets on empty list — this is handled automatically by the orchestrator |
 | Voice mode: no audio             | Check microphone permissions and that `openai` package is installed                                  |
 
----
-"# ai-financial-assistant" 
-#   f i n n i e _ a i _ f i n a n c i a l _ a s s t  
- #   f i n n i e _ a i _ f i n a n c i a l _ a s s t  
- #   f i n n i e _ a i _ f i n a n c i a l _ a s s t  
- #   f i n n i e _ a i _ f i n a n c i a l _ a s s t  
- #   f i n n i e _ a i _ f i n a n c i a l _ a s s t  
- 
+
