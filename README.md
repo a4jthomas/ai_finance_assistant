@@ -255,7 +255,7 @@ START → model ─┬─ tools → model  (loop back if more tool calls)
                └─ END             (no tool calls → done)
 ```
 
-This means the LLM can chain multiple tool calls in sequence (e.g., search for a product, then search again with refined terms) without any custom loop code. LangGraph manages the cycle natively.
+This means the LLM can chain multiple tool calls in sequence (e.g., search for an answer, then search again with refined terms) without any custom loop code. LangGraph manages the cycle natively.
 
 ### State Management
 
