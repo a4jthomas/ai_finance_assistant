@@ -1,5 +1,25 @@
 # Finnie— Multi-Agent Voice-Enabled Financial Assistant
 
+## CareerPilot job finder
+
+The repository also includes a standalone Streamlit job workflow in
+[`job_finder.py`](./job_finder.py). It searches the public Arbeitnow feed,
+generates a truthful cover-letter draft (offline or with OpenAI), and creates a
+review-first Playwright helper for filling common application fields. The helper
+intentionally never submits an application.
+
+```powershell
+pip install -r requirements-job-finder.txt
+python -m streamlit run job_finder.py
+```
+
+To run a downloaded fill script, install the browser once:
+
+```powershell
+playwright install chromium
+python fill_application.py
+```
+
 Finnie is a **multi-agent AI system** built with [LangGraph](https://langchain-ai.github.io/langgraph/) that powers an e-financial customer assistant. It combines financial question discovery (via RAG semantic search into a private vector db), market insight analysis (via API) and tax education (via RAG semantic search) and Voice IO - all orchestrated through a graph of specialised agents that can run in parallel, ask follow-up questions mid-conversation, and synthesize multi-source answers into a single coherent reply and displayed from a web interface (Streamlit).  It features a portfolio analysis, financial goal planning, and tax calculator functionality in the form of tool widgets from web interface. 
 
 ---
@@ -309,5 +329,4 @@ The graph is compiled with `MemorySaver`, and every invocation uses a consistent
 | `ModuleNotFoundError: src.voice` | Create `src/voice.py` or run without `--voice`                                                       |
 | Stale agent results across turns | The `agent_results_reducer` resets on empty list — this is handled automatically by the orchestrator |
 | Voice mode: no audio             | Check microphone permissions and that `openai` package is installed                                  |
-
 
